@@ -47,7 +47,7 @@ struct slip {
 int slip_init(struct slip *slip);
 void slip_deinit(struct slip *slip);
 
-int slip_decode(struct slip *slip, uint8_t *data, size_t size);
+void slip_decode(struct slip *slip, uint8_t *data, size_t size);
 void slip_decode_store(struct slip *slip, uint8_t byte);
 
 int slip_encode(struct slip *slip, uint8_t *out, size_t *outlen, size_t outcap,

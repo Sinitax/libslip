@@ -3,8 +3,8 @@ LIBSLIP_1.0 {
 		slip_init;
 		slip_deinit;
 
-		slip_set_rx_callback;
 		slip_decode;
+		slip_decode_store;
 
 		slip_encode;
 	local: *;

@@ -116,7 +116,7 @@ slip_decode_store(struct slip *slip, uint8_t byte)
 	slip->rx_buf[slip->rx_index++] = byte;
 }
 
-int
+void
 slip_decode(struct slip *slip, uint8_t* data, size_t size)
 {
 	uint8_t rx_byte;
@@ -136,10 +136,9 @@ slip_decode(struct slip *slip, uint8_t* data, size_t size)
 			break;
 		default:
 			LIBSLIP_ASSERT(false);
+			abort();
 		}
 	}
-
-	return 0;
 }
 
 int
