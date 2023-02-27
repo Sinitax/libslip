@@ -4,26 +4,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#ifdef LIBSLIP_ASSERT_ENABLE
-
-#include <stdio.h>
-
-#define LIBSLIP_ASSERT(x) libslip_assert((x), __FILE__, __LINE__, #x)
-
-static inline void libslip_assert(int cond,
-	const char *file, int line, const char *condstr)
-{
-	if (cond) return;
-
-	fprintf(stderr, "libslip: Assertion failed at %s:%i (%s)\n",
-		file, line, condstr);
-	abort();
-}
-
-#else
-#define LIBSLIP_ASSERT(x)
-#endif
-
 struct slip {
 	int rx_state;
 

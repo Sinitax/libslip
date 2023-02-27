@@ -4,7 +4,7 @@ BINDIR ?= /bin
 CFLAGS = -I include
 
 ifeq "$(LIBSLIP_DEBUG)" "1"
-CFLAGS += -g -DLIBSLIP_ASSERT_ENABLE=1
+CFLAGS += -g
 endif
 
 all: build/libslip.so build/libslip.a

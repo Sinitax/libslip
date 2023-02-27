@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#define ASSERT(x) assert((x), __FILE__, __LINE__, #x)
+
 enum {
 	SLIPDEC_START_STATE,
 	SLIPDEC_IN_FRAME_STATE,
@@ -14,6 +16,16 @@ enum {
 static void slip_decode_start(struct slip *slip, uint8_t rx_byte);
 static void slip_decode_inframe(struct slip *slip, uint8_t rx_byte);
 static void slip_decode_escseq(struct slip *slip, uint8_t rx_byte);
+
+static inline void assert(int cond,
+	const char *file, int line, const char *condstr)
+{
+	if (cond) return;
+
+	fprintf(stderr, "libslip: Assertion failed at %s:%i (%s)\n",
+		file, line, condstr);
+	abort();
+}
 
 static inline void
 store(uint8_t **cur, uint8_t *end, uint8_t byte)
@@ -83,11 +95,11 @@ slip_init(struct slip *slip)
 	slip->rx_buflen = 0;
 	slip->rx_buf = NULL;
 
-	LIBSLIP_ASSERT(slip->rx_packet != NULL);
-	LIBSLIP_ASSERT(slip->realloc != NULL);
+	ASSERT(slip->rx_packet != NULL);
+	ASSERT(slip->realloc != NULL);
 
-	LIBSLIP_ASSERT(slip->esc != slip->start);
-	LIBSLIP_ASSERT(slip->esc != slip->end);
+	ASSERT(slip->esc != slip->start);
+	ASSERT(slip->esc != slip->end);
 
 	/* build decode table */
 	for (i = 0; i < 256; i++)
@@ -111,7 +123,7 @@ slip_decode_store(struct slip *slip, uint8_t byte)
 		else
 			slip->rx_buflen *= 2;
 		slip->rx_buf = slip->realloc(slip->rx_buf, slip->rx_buflen);
-		LIBSLIP_ASSERT(slip->rx_buf != NULL);
+		ASSERT(slip->rx_buf != NULL);
 	}
 	slip->rx_buf[slip->rx_index++] = byte;
 }
@@ -135,7 +147,6 @@ slip_decode(struct slip *slip, uint8_t* data, size_t size)
 			slip_decode_escseq(slip, rx_byte);
 			break;
 		default:
-			LIBSLIP_ASSERT(false);
 			abort();
 		}
 	}
