@@ -1,11 +1,6 @@
 #include "slip.h"
 
-#include <asm-generic/errno.h>
 #include <errno.h>
-#include <stdio.h>
-#include <stdint.h>
-
-#define ASSERT(x) assert((x), __FILE__, __LINE__, #x)
 
 enum {
 	SLIPDEC_START_STATE,
@@ -13,19 +8,9 @@ enum {
 	SLIPDEC_ESC_STATE
 };
 
-static void slip_decode_start(struct slip *slip, uint8_t rx_byte);
-static void slip_decode_inframe(struct slip *slip, uint8_t rx_byte);
-static void slip_decode_escseq(struct slip *slip, uint8_t rx_byte);
-
-static inline void assert(int cond,
-	const char *file, int line, const char *condstr)
-{
-	if (cond) return;
-
-	fprintf(stderr, "libslip: Assertion failed at %s:%i (%s)\n",
-		file, line, condstr);
-	abort();
-}
+static int slip_decode_start(struct slip *slip, uint8_t rx_byte);
+static int slip_decode_inframe(struct slip *slip, uint8_t rx_byte);
+static int slip_decode_escseq(struct slip *slip, uint8_t rx_byte);
 
 static inline void
 store(uint8_t **cur, uint8_t *end, uint8_t byte)
@@ -33,7 +18,7 @@ store(uint8_t **cur, uint8_t *end, uint8_t byte)
 	if (*cur < end) *(*cur)++ = byte;
 }
 
-void
+int
 slip_decode_start(struct slip *slip, uint8_t rx_byte)
 {
 	/* wait for packet start */
@@ -41,11 +26,15 @@ slip_decode_start(struct slip *slip, uint8_t rx_byte)
 		slip->rx_index = 0;
 		slip->rx_state = SLIPDEC_IN_FRAME_STATE;
 	}
+
+	return 0;
 }
 
-void
+int
 slip_decode_inframe(struct slip *slip, uint8_t rx_byte)
 {
+	int rc;
+
 	if (rx_byte == slip->end) {
 		/* end of packet */
 		slip->rx_packet(slip, slip->rx_packet_userdata,
@@ -62,14 +51,18 @@ slip_decode_inframe(struct slip *slip, uint8_t rx_byte)
 		slip->rx_state = SLIPDEC_ESC_STATE;
 	} else {
 		/* data byte */
-		slip_decode_store(slip, rx_byte);
+		rc = slip_decode_store(slip, rx_byte);
+		if (rc) return rc;
 	}
+
+	return 0;
 }
 
-void
+int
 slip_decode_escseq(struct slip *slip, uint8_t rx_byte)
 {
 	uint8_t dec;
+	int rc;
 
 	dec = slip->esc_dec[rx_byte];
 	if (!slip->esc_active[dec]) {
@@ -79,9 +72,12 @@ slip_decode_escseq(struct slip *slip, uint8_t rx_byte)
 		slip->rx_state = SLIPDEC_START_STATE;
 		slip->rx_index = 0;
 	} else {
-		slip_decode_store(slip, dec);
+		rc = slip_decode_store(slip, dec);
+		if (rc) return rc;
 		slip->rx_state = SLIPDEC_IN_FRAME_STATE;
 	}
+
+	return 0;
 }
 
 int
@@ -95,11 +91,10 @@ slip_init(struct slip *slip)
 	slip->rx_buflen = 0;
 	slip->rx_buf = NULL;
 
-	ASSERT(slip->rx_packet != NULL);
-	ASSERT(slip->realloc != NULL);
-
-	ASSERT(slip->esc != slip->start);
-	ASSERT(slip->esc != slip->end);
+	if (slip->rx_packet) return -EINVAL;
+	if (slip->realloc) return -EINVAL;
+	if (slip->esc != slip->start) return -EINVAL;
+	if (slip->esc != slip->end) return -EINVAL;
 
 	/* build decode table */
 	for (i = 0; i < 256; i++)
@@ -114,42 +109,51 @@ slip_deinit(struct slip *slip)
 	free(slip->rx_buf);
 }
 
-void
+int
 slip_decode_store(struct slip *slip, uint8_t byte)
 {
+	int rc;
+
 	if (slip->rx_index >= slip->rx_buflen) {
 		if (!slip->rx_buflen)
 			slip->rx_buflen = 256;
 		else
 			slip->rx_buflen *= 2;
-		slip->rx_buf = slip->realloc(slip->rx_buf, slip->rx_buflen);
-		ASSERT(slip->rx_buf != NULL);
+		rc = slip->realloc((void **)&slip->rx_buf, slip->rx_buflen);
+		if (rc) return rc;
 	}
 	slip->rx_buf[slip->rx_index++] = byte;
+
+	return 0;
 }
 
-void
+int
 slip_decode(struct slip *slip, uint8_t* data, size_t size)
 {
 	uint8_t rx_byte;
 	size_t i;
+	int rc;
 
 	for (i = 0; i < size; i++) {
 		rx_byte = data[i];
 		switch (slip->rx_state) {
 		case SLIPDEC_START_STATE:
-			slip_decode_start(slip, rx_byte);
+			rc = slip_decode_start(slip, rx_byte);
 			break;
 		case SLIPDEC_IN_FRAME_STATE:
-			slip_decode_inframe(slip, rx_byte);
+			rc = slip_decode_inframe(slip, rx_byte);
 			break;
 		case SLIPDEC_ESC_STATE:
-			slip_decode_escseq(slip, rx_byte);
+			rc = slip_decode_escseq(slip, rx_byte);
 			break;
 		default:
-			abort();
+			rc = -EINVAL;
+			break;
 		}
+		if (rc) return rc;
 	}
+
+	return 0;
 }
 
 int
@@ -175,7 +179,7 @@ slip_encode(struct slip *slip, uint8_t* out, size_t *outlen, size_t outcap,
 
 	store(&pos, end, slip->end);
 
-	if (pos >= end) return ENOBUFS;
+	if (pos >= end) return -ENOBUFS;
 
 	*outlen = pos - out;
 

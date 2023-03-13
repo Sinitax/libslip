@@ -16,7 +16,7 @@ struct slip {
 		uint8_t *data, size_t size);
 	void *rx_packet_userdata;
 
-	void *(*realloc)(void *buffer, size_t size);
+	int (*realloc)(void **buffer, size_t size);
 
 	uint8_t esc, start, end;
 	bool esc_active[256];
@@ -27,8 +27,8 @@ struct slip {
 int slip_init(struct slip *slip);
 void slip_deinit(struct slip *slip);
 
-void slip_decode(struct slip *slip, uint8_t *data, size_t size);
-void slip_decode_store(struct slip *slip, uint8_t byte);
+int slip_decode(struct slip *slip, uint8_t *data, size_t size);
+int slip_decode_store(struct slip *slip, uint8_t byte);
 
-int slip_encode(struct slip *slip, uint8_t *out, size_t *outlen, size_t outcap,
-	uint8_t *in, size_t inlen);
+int slip_encode(struct slip *slip, uint8_t *out, size_t *outlen,
+	size_t outcap, uint8_t *in, size_t inlen);
